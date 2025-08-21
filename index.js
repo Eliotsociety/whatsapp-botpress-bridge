@@ -1,38 +1,46 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
-const fetch = require('node-fetch');
+import express from "express";
+import bodyParser from "body-parser";
+import axios from "axios";
 
-// Replace with your Botpress webhook URL
+const app = express();
+app.use(bodyParser.json());
+
+// Your Botpress endpoint
 const BOTPRESS_URL = "https://cdn.botpress.cloud/webchat/v3.2/shareable.html?configUrl=https://files.bpcontent.cloud/2025/08/21/07/20250821074212-8E8V1IJL.json";
 
-const client = new Client({
-    authStrategy: new LocalAuth()
-});
+// WhatsApp webhook
+app.post("/webhook", async (req, res) => {
+  try {
+    const message = req.body?.messages?.[0]?.text?.body;
+    const from = req.body?.messages?.[0]?.from;
 
-client.on('qr', qr => {
-    qrcode.generate(qr, { small: true });
-    console.log('Scan this QR code with your WhatsApp phone app');
-});
+    if (message) {
+      // Send user message to Botpress
+      const bpResponse = await axios.post(BOTPRESS_URL, { text: message });
+      const reply = bpResponse.data?.responses?.[0]?.text || "Sorry, no reply.";
 
-client.on('ready', () => {
-    console.log('✅ WhatsApp bot is ready!');
-});
-
-client.on('message', async msg => {
-    try {
-        const response = await fetch(BOTPRESS_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'message', text: msg.body })
-        });
-        const data = await response.json();
-
-        if (data.responses && data.responses.length > 0) {
-            msg.reply(data.responses[0].text);
+      // Send reply back to WhatsApp using Cloud API
+      await axios.post(
+        `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+        {
+          messaging_product: "whatsapp",
+          to: from,
+          text: { body: reply },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+            "Content-Type": "application/json",
+          },
         }
-    } catch (err) {
-        console.error("❌ Error:", err);
+      );
     }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("Webhook error:", err.response?.data || err.message);
+    res.sendStatus(500);
+  }
 });
 
-client.initialize();
+app.listen(3000, () => console.log("Bot is running..."));
