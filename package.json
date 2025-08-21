@@ -2,12 +2,10 @@
   "name": "whatsapp-botpress-bridge",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "type": "module",
   "dependencies": {
-    "whatsapp-web.js": "^1.21.0",
-    "qrcode-terminal": "^0.12.0",
-    "node-fetch": "^3.3.2"
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "axios": "^1.6.2"
   }
 }
